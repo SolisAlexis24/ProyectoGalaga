@@ -65,6 +65,7 @@ lim_derecho 	equ		39
 ;Valores de referencia para la posición inicial del jugador
 ini_columna 	equ 	lim_derecho/2
 ini_renglon 	equ 	22
+ren_bala_in		equ     19 ;Renglon de las balas cuando son disparadas
 
 ;Valores para la posición de los controles e indicadores dentro del juego
 ;Lives
@@ -126,6 +127,7 @@ ren_aux 		db 		0 		;variable auxiliar para operaciones con posicion - renglon
 
 conta 			db 		0 		;contador
 conta_movs		db      0		;Contador que contabiliza los movimientos del jugador
+col_disparo		db		0		;Contador de las balas disparadas
 
 ;; Variables de ayuda para lectura de tiempo del sistema
 tick_ms			dw 		55 		;55 ms por cada tick del sistema, esta variable se usa para operación de MUL convertir ticks a segundos
@@ -147,7 +149,6 @@ boton_bg_color	db 		0
 ocho			db 		8
 ;Cuando el driver del mouse no está disponible
 no_mouse		db 	'No se encuentra driver de mouse. Presione [enter] para salir$'
-pos_bala		db		19
 ;////////////////////////////////////////////////////
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -289,8 +290,11 @@ endm
 ;revisa_teclado - Revisa que tecla se ha presionado y si esta coincide con a (izquierda), d (derecha)
 ; o " " (disparar). Si alguna de las reclas coincide, se llama al procedimeitno que realiza la accion
 revisa_teclado		macro
-	mov ah, 08 
-	int 21h ;int 21h con la opcion AH=08, guarda el ASCII de la tecla presionada en AL
+	mov ah, 01h
+	int 16h ;Verifica si hay alguna tecla pendiente de ser leída utilizando la interrupción int 16h con la opción AH=01h.
+	jz term1
+	mov ah, 00h; Si hay una tecla pendiente de ser leída, se utiliza la interrupción int 16h con la opción AH=00h para leer la tecla del teclado y guardar el valor ASCII en el registro AL.
+	int 16h
 	cmp al, teclaA ; Si AL = teclaA, se presionó a
 	je izquierdaPlayer ;Salta a la etiqueta para llamar al procedimiento de mover a la izquierda
 	cmp al, teclaD ; Si AL = teclaD, se presionó d
@@ -311,6 +315,17 @@ revisa_teclado		macro
 	jmp term1
 	term1:
 endm
+
+borrar_balas_top	macro
+	mov dl, lim_izquierdo
+	for_borrar:
+	posiciona_cursor 0, dh
+	imprime_caracter_color 219, cNegro, bgNegro
+	inc dl
+	cmp dl, lim_derecho
+	jne for_borrar
+endm
+
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;Fin Macros;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -896,16 +911,33 @@ salir:				;inicia etiqueta salir
 	endp
 
 	DISPARAR_PLAYER proc
-		mov [pos_bala], 19
-		pos_disp:
-		posiciona_cursor pos_bala,[player_col]
-		imprime_caracter_color 178,cAzul,bgNegro
-		cmp [pos_bala], 0
-		je desh_disp
-		dec [pos_bala]
-		desh_disp:
-		posiciona_cursor [pos_bala], [player_col]
+		mov dl, [player_col]
+		mov [col_disparo], dl
+		mov dh, ren_bala_in
+		posiciona_cursor dh,[col_disparo]
+		imprime_caracter_color 173,cAzul,bgNegro
+		repos_bala:
+		call DELAY
+		posiciona_cursor dh,[col_disparo]
 		imprime_caracter_color 178,cNegro,bgNegro
+		dec dh
+		posiciona_cursor dh,[col_disparo]
+		imprime_caracter_color 173,cAzul,bgNegro
+		cmp dh, 1
+		jnz repos_bala
+		ret
+		borrar_balas_top
+	endp
+
+	DELAY proc
+		pusha           ; Guardar los registros en el stack
+						; Utilizar un bucle para ocupar el tiempo de ejecución
+		mov cx, 0FFFFh ; El valor en CX será el número de iteraciones del bucle
+		bucle_retardo:
+		dec ax
+		dec bx
+		loop bucle_retardo ; Reducir el valor de CX en 1 y saltar a bucle_retardo si CX no es 0
+		popa            ; Restaurar los registros desde el stack
 		ret
 	endp
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
