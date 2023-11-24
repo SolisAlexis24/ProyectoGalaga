@@ -757,7 +757,6 @@ salir:				;inicia etiqueta salir
 
 	;Imprime la nave del enemigo
 	PRINT_ENEMY proc
-
 		posiciona_cursor [ren_aux],[col_aux]
 		imprime_caracter_color 178,cRojo,bgNegro
 		inc [ren_aux]
@@ -853,28 +852,28 @@ salir:				;inicia etiqueta salir
 		ret
 	endp
 
-
+	;Procedimiento para mover a la izquierda
 	MOVER_IZQUIERDA_PLAYER proc
-		cmp conta_movs, 0
-		ja no_primero_izq
-		primero_izq:
-		mov al, [player_col]
-		mov ah, [player_ren]
+		cmp conta_movs, 0 ;Se verifica si es el primer movimiento realizado por el jugador
+		ja no_primero_izq ;Si no lo es, salta a la etiqueta para moverlo desde una posicion diferente al centro
+		primero_izq: ;Primer movimiento desde por el jugador a la izquierda
+		mov al, [player_col] 
+		mov ah, [player_ren] ; Se mueve a AL y AH la posicion del jugador 
 		mov [ren_aux], ah
-		mov [col_aux], al
-		call DELETE_PLAYER
-		dec [player_col]
-		call IMPRIME_JUGADOR
-		inc [conta_movs]
+		mov [col_aux], al ;Se mueve lo quetienen AL y AH a ren_aux y col_aux. esto porque son las variables que utiliza DELETE_PLAYER
+		call DELETE_PLAYER ; Se borra al jugador
+		dec [player_col] ;Como se mueve a la izquierda, se decrementa el valor de la columna del jugador
+		call IMPRIME_JUGADOR ;Se reimprime el jugador con el nuevo valor de columna
+		inc [conta_movs] ; Marcador para indicar que ya se ha realizado al menos un movimiento
 		no_primero_izq:
 		mov al, [player_col]
-		mov ah, [player_ren]
-		mov bl, al
-		sub bl, 2
-		cmp bl, lim_izquierdo
-		je no_moveizq
-		mov [ren_aux], ah
-		mov [col_aux], al
+		mov ah, [player_ren] ;Se mueve a AL y AH la posicion del jugador 
+		mov bl, al ;Se obtiene el valor de AL a BL, esto para poder conseguir el valor de la columna del jugador
+		sub bl, 2 ; Se le resta 2 a la columna del jugador, esto es porque la nave tiene un ancho de 2 a la izquierda
+		cmp bl, lim_izquierdo 
+		je no_moveizq ; Si el limite izquierdo que tendria la nave es el mismo que tiene el limite izquierdo de la pantalla, no se realiza el movimiento
+		mov [ren_aux], ah ;Si no se cumple lo anterior, entonces la nave se mueve siguiendo la misma lógica que en el primer movimiento
+		mov [col_aux], al ;Se mueve lo quetienen AL y AH a ren_aux y col_aux. esto porque son las variables que utiliza DELETE_PLAYER
 		call DELETE_PLAYER
 		dec [player_col]
 		call IMPRIME_JUGADOR
@@ -882,27 +881,28 @@ salir:				;inicia etiqueta salir
 		ret
 	endp
 
+	;Procedimiento para mover a la derecha
 	MOVER_DERECHA_PLAYER proc
-		cmp conta_movs, 0
-		ja no_primero_der
-		primero_der:
+		cmp conta_movs, 0 ;Se verifica si es el primer movimiento realizado por el jugador
+		ja no_primero_der ;Si no lo es, salta a la etiqueta para moverlo desde una posicion diferente al centro
+		primero_der: ;Primer movimiento desde por el jugador a la derecha
 		mov al, [player_col]
-		mov ah, [player_ren]
+		mov ah, [player_ren] ; Se mueve a AL y AH la posicion del jugador
 		mov [ren_aux], ah
 		mov [col_aux], al
-		call DELETE_PLAYER
-		inc [player_col]
-		call IMPRIME_JUGADOR
-		inc [conta_movs]
+		call DELETE_PLAYER ;Se mueve lo quetienen AL y AH a ren_aux y col_aux. esto porque son las variables que utiliza DELETE_PLAYER
+		inc [player_col] ;Como se mueve a la derecha, se incrementa el valor de la columna del jugador
+		call IMPRIME_JUGADOR ;Se reimprime el jugador con el nuevo valor de columna
+		inc [conta_movs] ;Marcador para indicar que ya se ha realizado al menos un movimiento
 		no_primero_der:
-		mov al, [player_col]
-		mov ah, [player_ren]
-		mov bl, al
-		add bl, 2
-		cmp bl, lim_derecho
-		je no_moveder
-		mov [ren_aux], ah
-		mov [col_aux], al
+		mov al, [player_col] ;Se mueve a AL y AH la posicion del jugador
+		mov ah, [player_ren] 
+		mov bl, al ;Se obtiene el valor de AL a BL, esto para poder conseguir el valor de la columna del jugador
+		add bl, 2 ; Se le suma 2 a la columna del jugador, esto es porque la nave tiene un ancho de 2 a ;a derecha
+		cmp bl, lim_derecho 
+		je no_moveder ; Si el limite derecho que tendria la nave es el mismo que tiene el limite derechp de la pantalla, no se realiza el movimiento
+		mov [ren_aux], ah ;Si no se cumple lo anterior, entonces la nave se mueve siguiendo la misma lógica que en el primer movimiento
+		mov [col_aux], al ;Se mueve lo quetienen AL y AH a ren_aux y col_aux. esto porque son las variables que utiliza DELETE_PLAYER
 		call DELETE_PLAYER
 		inc [player_col]
 		call IMPRIME_JUGADOR
