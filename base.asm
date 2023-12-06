@@ -127,7 +127,7 @@ ren_aux 		db 		0 		;variable auxiliar para operaciones con posicion - renglon
 
 conta 			db 		0 		;contador
 conta_movs		db      0		;Contador que contabiliza los movimientos del jugador
-col_disparo		db		0		;Contador de las balas disparadas
+
 
 ;; Variables de ayuda para lectura de tiempo del sistema
 tick_ms			dw 		55 		;55 ms por cada tick del sistema, esta variable se usa para operación de MUL convertir ticks a segundos
@@ -143,7 +143,9 @@ boton_renglon 	db 		0
 boton_columna 	db 		0
 boton_color		db 		0
 boton_bg_color	db 		0
-
+balap_en_pant	db		0 ;Esta variable verifica si ya existe una bala dibujada en pantalla
+balap_x			db		ini_columna
+balap_y			db		ren_bala_in
 
 ;Auxiliar para calculo de coordenadas del mouse en modo Texto
 ocho			db 		8
@@ -299,32 +301,21 @@ revisa_teclado		macro
 	je izquierdaPlayer ;Salta a la etiqueta para llamar al procedimiento de mover a la izquierda
 	cmp al, teclaD ; Si AL = teclaD, se presionó d
 	je derechaPlayer ; Salta a la etiqueta para llamar al procedimiento de mover a la derecha
-	cmp al, teclaEsp ; Si AL = teclaEsp, se presionó " "
-	je dispararPlayer ;Salta a la etiqueta para llamar al procedimiento de dispararplayer
+	;cmp al, teclaEsp ; Si AL = teclaEsp, se presionó " "
+	;je dispararPlayer ;Salta a la etiqueta para llamar al procedimiento de dispararplayer
 	cmp al, 0Dh ; Boton [enter] para salir
 	je salir
 	jmp term1 ;Sino es ninguna de las anteriores se salta al final del macro para no hacer nada
 	izquierdaPlayer:
-	call MOVER_IZQUIERDA_PLAYER ;Se llama al procedimiento de mover a la izquierda al jugardor
-	jmp term1
+		call MOVER_IZQUIERDA_PLAYER ;Se llama al procedimiento de mover a la izquierda al jugardor
+		jmp term1
 	derechaPlayer:
-	call MOVER_DERECHA_PLAYER ;Se llama al procedimiento de mover a la derecha al jugardor
-	jmp term1
-	dispararPlayer:
-	call DISPARAR_PLAYER ;Se llama al procedimiento de disparar del jugador
-	jmp term1
+		call MOVER_DERECHA_PLAYER ;Se llama al procedimiento de mover a la derecha al jugardor
+		jmp term1
 	term1:
 endm
 
-borrar_balas_top	macro
-	mov dl, lim_izquierdo
-	for_borrar:
-	posiciona_cursor 0, dh
-	imprime_caracter_color 219, cNegro, bgNegro
-	inc dl
-	cmp dl, lim_derecho
-	jne for_borrar
-endm
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;Fin Macros;;;;;;;
@@ -351,13 +342,16 @@ imprime_ui:
 ;En "mouse_no_clic" se revisa que el boton izquierdo del mouse no esté presionado
 ;Si el botón está presionado, continúa a la sección "mouse"
 ;si no, se mantiene indefinidamente en "mouse_no_clic" hasta que se suelte
+
 mouse_no_clic:
 	lee_mouse
 	test bx,0001h
 	jnz mouse_no_clic
 ;Lee el mouse y avanza hasta que se haga clic en el boton izquierdo
 mouse:
+	
 	revisa_teclado
+	call DISPARAR_PLAYER
 	lee_mouse
 conversion_mouse:
 	;Leer la posicion del mouse y hacer la conversion a resolucion
@@ -857,11 +851,7 @@ salir:				;inicia etiqueta salir
 		cmp conta_movs, 0 ;Se verifica si es el primer movimiento realizado por el jugador
 		ja no_primero_izq ;Si no lo es, salta a la etiqueta para moverlo desde una posicion diferente al centro
 		primero_izq: ;Primer movimiento desde por el jugador a la izquierda
-		mov al, [player_col] 
-		mov ah, [player_ren] ; Se mueve a AL y AH la posicion del jugador 
-		mov [ren_aux], ah
-		mov [col_aux], al ;Se mueve lo quetienen AL y AH a ren_aux y col_aux. esto porque son las variables que utiliza DELETE_PLAYER
-		call DELETE_PLAYER ; Se borra al jugador
+		call BORRA_JUGADOR ; Se borra al jugador
 		dec [player_col] ;Como se mueve a la izquierda, se decrementa el valor de la columna del jugador
 		call IMPRIME_JUGADOR ;Se reimprime el jugador con el nuevo valor de columna
 		inc [conta_movs] ; Marcador para indicar que ya se ha realizado al menos un movimiento
@@ -886,11 +876,7 @@ salir:				;inicia etiqueta salir
 		cmp conta_movs, 0 ;Se verifica si es el primer movimiento realizado por el jugador
 		ja no_primero_der ;Si no lo es, salta a la etiqueta para moverlo desde una posicion diferente al centro
 		primero_der: ;Primer movimiento desde por el jugador a la derecha
-		mov al, [player_col]
-		mov ah, [player_ren] ; Se mueve a AL y AH la posicion del jugador
-		mov [ren_aux], ah
-		mov [col_aux], al
-		call DELETE_PLAYER ;Se mueve lo quetienen AL y AH a ren_aux y col_aux. esto porque son las variables que utiliza DELETE_PLAYER
+		call BORRA_JUGADOR
 		inc [player_col] ;Como se mueve a la derecha, se incrementa el valor de la columna del jugador
 		call IMPRIME_JUGADOR ;Se reimprime el jugador con el nuevo valor de columna
 		inc [conta_movs] ;Marcador para indicar que ya se ha realizado al menos un movimiento
@@ -910,23 +896,13 @@ salir:				;inicia etiqueta salir
 		ret
 	endp
 
-	DISPARAR_PLAYER proc
-		mov dl, [player_col]
-		mov [col_disparo], dl
-		mov dh, ren_bala_in
-		posiciona_cursor dh,[col_disparo]
-		imprime_caracter_color 173,cAzul,bgNegro
-		repos_bala:
-		call DELAY
-		posiciona_cursor dh,[col_disparo]
-		imprime_caracter_color 178,cNegro,bgNegro
-		dec dh
-		posiciona_cursor dh,[col_disparo]
-		imprime_caracter_color 173,cAzul,bgNegro
-		cmp dh, 1
-		jnz repos_bala
+	BORRA_ENEMIGO proc
+		mov al,[enemy_col]
+		mov ah,[enemy_ren]
+		mov [col_aux],al
+		mov [ren_aux],ah
+		call DELETE_PLAYER
 		ret
-		borrar_balas_top
 	endp
 
 	DELAY proc
@@ -934,12 +910,42 @@ salir:				;inicia etiqueta salir
 						; Utilizar un bucle para ocupar el tiempo de ejecución
 		mov cx, 0FFFFh ; El valor en CX será el número de iteraciones del bucle
 		bucle_retardo:
-		dec ax
-		dec bx
+		dec ax				;AGREGAR INSTRUCCIONES DEMOVIMIENTO DE REGISTROS ENTRE MAS DELAY SE REQUIERA
 		loop bucle_retardo ; Reducir el valor de CX en 1 y saltar a bucle_retardo si CX no es 0
 		popa            ; Restaurar los registros desde el stack
 		ret
 	endp
+;Este procedimiento modifica la posicion de las balas si ya hay una en pantalla o imprime balas en la pantalla cuando el jugador presiona espacio en el teclado 
+	DISPARAR_PLAYER proc
+		cmp balap_en_pant, 1 ;Se verifica si hay alguna bala en la pantalla
+		je repos_bala ; Si hay una bala en pantalla, la reposiciona
+		cmp al, teclaEsp ; Si AL = teclaEsp, se presionó " "
+		jne fin_disp ; Si no  se ha presionado el espacio y no hay balas en pantalla, se omite el proceso
+		dibujar_bala:
+		mov [balap_y], ren_bala_in
+		mov dl, [player_col]
+		mov [balap_x], dl
+		posiciona_cursor balap_y, balap_x ;Se posiciona el cursor a la posicion inicial de la bala (cualquiera que sea la columna y el renglon de partida)
+		imprime_caracter_color 173,cAzul,bgNegro ;proyectil pintado 
+		mov [balap_en_pant], 1 ;Marca que hay una bala en pantalla
+		jmp fin_disp
+		repos_bala:
+		call DELAY ;Pequeño delay para mostrar la bala 
+		cmp balap_y, 2 ;Se fija si no es el final de la pantalla
+		je borrar_disparo ;Si lo es, se borra el disparo
+		posiciona_cursor balap_y, balap_x ;Sino, se posiciona el cursor en la posicion indicada
+		imprime_caracter_color 178,cNegro,bgNegro ;Se borra el proyectil
+		dec balap_y ;Se decrementa el renglon (esto hace que la bala "suba")
+		posiciona_cursor balap_y, balap_x
+		imprime_caracter_color 173,cAzul,bgNegro ;Se reimprime el proyectil mas arriba
+		jmp fin_disp
+		borrar_disparo:
+		mov balap_en_pant, 0 ;Se indica que no hay disparos en pantalla
+		posiciona_cursor balap_y, balap_x
+		imprime_caracter_color 178,cNegro,bgNegro ;Se borra el proyectil
+		fin_disp:
+		ret
+		endp
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;FIN PROCEDIMIENTOS;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
