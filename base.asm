@@ -127,7 +127,9 @@ ren_aux 		db 		0 		;variable auxiliar para operaciones con posicion - renglon
 
 conta 			db 		0 		;contador
 conta_movs		db      0		;Contador que contabiliza los movimientos del jugador
-
+conta_movs_ene_izq_1	db	0
+conta_movs_ene_izq_2	db	0
+conta_movs_ene_der	db	0
 
 ;; Variables de ayuda para lectura de tiempo del sistema
 tick_ms			dw 		55 		;55 ms por cada tick del sistema, esta variable se usa para operación de MUL convertir ticks a segundos
@@ -146,6 +148,7 @@ boton_bg_color	db 		0
 balap_en_pant	db		0 ;Esta variable verifica si ya existe una bala dibujada en pantalla
 balap_x			db		ini_columna
 balap_y			db		ren_bala_in
+
 
 ;Auxiliar para calculo de coordenadas del mouse en modo Texto
 ocho			db 		8
@@ -315,6 +318,31 @@ revisa_teclado		macro
 	term1:
 endm
 
+;Devuelve los limites izquierdo y derecho del enemigo en al y ah respectivamente
+calcular_limites_enemigo	macro
+	mov bl, enemy_col
+	mov bh, enemy_ren
+	sub bl, 2
+	mov al, bl ;limite izquierdo del enemigo en al
+	add bl, 4
+	mov ah, bl ;limite derecho del enemigo en ah
+	endm
+
+detectar_colision		macro
+	calcular_limites_enemigo
+	cmp [balap_x], al
+	jb no_colision ;si balap_x < limite izq. del enemigo, no hay colision
+	cmp [balap_x], ah
+	jg no_colision ;si balap_x > limite der. del enemigo, no hay colision
+	cmp [balap_y], 5 ;si balap_y >= 5, no hay colision
+	ja no_colision
+	colision:
+		call BLINK_ENEMY
+		call BORRA_ENEMIGO
+		inc player_score
+		call IMPRIME_SCORE
+	no_colision:
+	endm
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -349,10 +377,11 @@ mouse_no_clic:
 	jnz mouse_no_clic
 ;Lee el mouse y avanza hasta que se haga clic en el boton izquierdo
 mouse:
-	
+	call MOVIMIENTO_ENEMIGO
 	revisa_teclado
 	call DISPARAR_PLAYER
 	lee_mouse
+	verificar_highscore
 conversion_mouse:
 	;Leer la posicion del mouse y hacer la conversion a resolucion
 	;80x25 (columnas x renglones) en modo texto
@@ -787,6 +816,79 @@ salir:				;inicia etiqueta salir
 		ret
 	endp
 
+	DELETE_ENEMY proc
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cNegro,bgNegro
+		inc [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cNegro,bgNegro
+		inc [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cNegro,bgNegro
+		sub [ren_aux],2
+		
+		dec [col_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cNegro,bgNegro
+		inc [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cNegro,bgNegro
+		dec [ren_aux]
+		
+		dec [col_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cNegro,bgNegro
+		
+		add [col_aux],3
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cNegro,bgNegro
+		inc [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cNegro,bgNegro
+		dec [ren_aux]
+		
+		inc [col_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cNegro,bgNegro
+		ret
+	endp
+
+	PRINT_ENEMY_BLUE proc
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cAzulClaro,bgNegro
+		inc [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cAzulClaro,bgNegro
+		inc [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cAzulClaro,bgNegro
+		sub [ren_aux],2
+		
+		dec [col_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cAzulClaro,bgNegro
+		inc [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cAzulClaro,bgNegro
+		dec [ren_aux]
+		
+		dec [col_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cAzulClaro,bgNegro
+		
+		add [col_aux],3
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cAzulClaro,bgNegro
+		inc [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cAzulClaro,bgNegro
+		dec [ren_aux]
+		
+		inc [col_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 178,cAzulClaro,bgNegro
+		ret
+	endp
 	;procedimiento IMPRIME_BOTON
 	;Dibuja un boton que abarca 3 renglones y 5 columnas
 	;con un caracter centrado dentro del boton
@@ -846,6 +948,15 @@ salir:				;inicia etiqueta salir
 		ret
 	endp
 
+	IMPRIME_ENEMIGO_AZUL proc
+		mov al,[enemy_col]
+		mov ah,[enemy_ren]
+		mov [col_aux],al
+		mov [ren_aux],ah
+		call PRINT_ENEMY_BLUE
+		ret
+	endp
+
 	;Procedimiento para mover a la izquierda
 	MOVER_IZQUIERDA_PLAYER proc
 		cmp conta_movs, 0 ;Se verifica si es el primer movimiento realizado por el jugador
@@ -901,7 +1012,7 @@ salir:				;inicia etiqueta salir
 		mov ah,[enemy_ren]
 		mov [col_aux],al
 		mov [ren_aux],ah
-		call DELETE_PLAYER
+		call DELETE_ENEMY
 		ret
 	endp
 
@@ -933,6 +1044,7 @@ salir:				;inicia etiqueta salir
 		call DELAY ;Pequeño delay para mostrar la bala 
 		cmp balap_y, 2 ;Se fija si no es el final de la pantalla
 		je borrar_disparo ;Si lo es, se borra el disparo
+		detectar_colision
 		posiciona_cursor balap_y, balap_x ;Sino, se posiciona el cursor en la posicion indicada
 		imprime_caracter_color 178,cNegro,bgNegro ;Se borra el proyectil
 		dec balap_y ;Se decrementa el renglon (esto hace que la bala "suba")
@@ -946,6 +1058,22 @@ salir:				;inicia etiqueta salir
 		fin_disp:
 		ret
 		endp
+	;Procedimiento para que el enemigo parpadee
+	BLINK_ENEMY		proc
+	mov cx, 0FFFFh
+	blink_loop:
+		call IMPRIME_ENEMIGO_AZUL
+		call DELAY
+		call IMPRIME_ENEMIGO
+	loop blink_loop
+	ret
+	endp
+
+	MOVIMIENTO_ENEMIGO	 proc
+	
+	ret
+	endp
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;FIN PROCEDIMIENTOS;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
