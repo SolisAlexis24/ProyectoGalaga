@@ -65,7 +65,7 @@ lim_derecho 	equ		39
 ;Valores de referencia para la posición inicial del jugador
 ini_columna 	equ 	lim_derecho/2
 ini_renglon 	equ 	22
-ren_bala_in		equ     19 ;Renglon de las balas cuando son disparadas
+ren_bala_in		equ     19 ;Renglon de las balas del jugador cuando son disparadas
 
 ;Valores para la posición de los controles e indicadores dentro del juego
 ;Lives
@@ -127,9 +127,8 @@ ren_aux 		db 		0 		;variable auxiliar para operaciones con posicion - renglon
 
 conta 			db 		0 		;contador
 conta_movs		db      0		;Contador que contabiliza los movimientos del jugador
-conta_movs_ene_izq_1	db	0
-conta_movs_ene_izq_2	db	0
-conta_movs_ene_der	db	0
+cont_balp		dw		0
+cont_bale		dw		0
 
 ;; Variables de ayuda para lectura de tiempo del sistema
 tick_ms			dw 		55 		;55 ms por cada tick del sistema, esta variable se usa para operación de MUL convertir ticks a segundos
@@ -145,9 +144,13 @@ boton_renglon 	db 		0
 boton_columna 	db 		0
 boton_color		db 		0
 boton_bg_color	db 		0
-balap_en_pant	db		0 ;Esta variable verifica si ya existe una bala dibujada en pantalla
+balap_en_pant	db		0 ;Esta variable verifica si ya existe una bala del jugador dibujada en pantalla
+bala_enemiga	db		0
 balap_x			db		ini_columna
 balap_y			db		ren_bala_in
+balae_x			db		ini_columna
+balae_y			db		6
+cont_col_jug	db		0
 
 
 ;Auxiliar para calculo de coordenadas del mouse en modo Texto
@@ -304,8 +307,6 @@ revisa_teclado		macro
 	je izquierdaPlayer ;Salta a la etiqueta para llamar al procedimiento de mover a la izquierda
 	cmp al, teclaD ; Si AL = teclaD, se presionó d
 	je derechaPlayer ; Salta a la etiqueta para llamar al procedimiento de mover a la derecha
-	;cmp al, teclaEsp ; Si AL = teclaEsp, se presionó " "
-	;je dispararPlayer ;Salta a la etiqueta para llamar al procedimiento de dispararplayer
 	cmp al, 0Dh ; Boton [enter] para salir
 	je salir
 	jmp term1 ;Sino es ninguna de las anteriores se salta al final del macro para no hacer nada
@@ -328,7 +329,17 @@ calcular_limites_enemigo	macro
 	mov ah, bl ;limite derecho del enemigo en ah
 	endm
 
-detectar_colision		macro
+calcular_limites_jugador	macro
+	mov bl, player_col
+	mov bh, player_ren
+	sub bl, 2
+	mov al, bl ;limite izquierdo del jugador en al
+	add bl, 4
+	mov ah, bl ;limite derecho del jugador en ah
+	endm
+
+;Macro para detectra la colision de una bala con el enemigo
+detectar_colision_en		macro
 	calcular_limites_enemigo
 	cmp [balap_x], al
 	jb no_colision ;si balap_x < limite izq. del enemigo, no hay colision
@@ -344,6 +355,39 @@ detectar_colision		macro
 	no_colision:
 	endm
 
+;Macro para detectar la colision de una bala con el jugador
+;AUN NO TERMINADO
+detectar_colision		macro
+	calcular_limites_jugador
+	cmp [balae_x], al
+	jb no_colision_jug ;si balap_x < limite izq. del jugador, no hay colision
+	cmp [balae_x], ah
+	jg no_colision_jug ;si balap_x > limite der. del jugador, no hay colision
+	cmp [balae_y], 20 ;si balap_y <= 18, no hay colision
+	jbe no_colision_jug
+	colision_jug:
+		cmp player_lives, 1
+		je no_colision_jug ;ESTO ES TEMPORAL HASTA QUE SE PROGRAME EL GAME OVER
+		call BORRAR_LIVES
+		dec player_lives
+		call IMPRIME_LIVES
+	no_colision_jug:
+	endm
+
+;Macro que lee el contador de tics y lo guarda en cualquiera que sea contador
+	read_time	macro contador
+	mov ah, 0
+	int 1Ah
+	mov contador, dx
+	endm
+
+;Macro que lee el contador de tics y lo resta con culquier contador anterior y lo compara con un espaciado
+	calcular_tiempo		macro contador, espaciado
+	mov ah, 0
+	int 1Ah
+	sub dx, contador
+	cmp dx, espaciado
+	endm
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;Fin Macros;;;;;;;
@@ -370,18 +414,17 @@ imprime_ui:
 ;En "mouse_no_clic" se revisa que el boton izquierdo del mouse no esté presionado
 ;Si el botón está presionado, continúa a la sección "mouse"
 ;si no, se mantiene indefinidamente en "mouse_no_clic" hasta que se suelte
-
 mouse_no_clic:
 	lee_mouse
 	test bx,0001h
 	jnz mouse_no_clic
 ;Lee el mouse y avanza hasta que se haga clic en el boton izquierdo
 mouse:
-	call MOVIMIENTO_ENEMIGO
+	;call MOVIMIENTO_ENEMIGO
+	call DISPARAR_ENEMIGO
 	revisa_teclado
 	call DISPARAR_PLAYER
 	lee_mouse
-	verificar_highscore
 conversion_mouse:
 	;Leer la posicion del mouse y hacer la conversion a resolucion
 	;80x25 (columnas x renglones) en modo texto
@@ -698,6 +741,23 @@ salir:				;inicia etiqueta salir
 		add di,2
 		pop cx
 		loop imprime_live
+		ret
+	endp
+
+
+	;Borra la ultima vida
+	BORRAR_LIVES proc
+		xor cx,cx
+		mov di,lives_col+20
+		mov cl,[player_lives]
+	borra_live:
+		push cx
+		mov ax,di
+		posiciona_cursor lives_ren,al
+		imprime_caracter_color 178,cNegro,bgNegro
+		add di,2
+		pop cx
+		loop borra_live
 		ret
 	endp
 
@@ -1039,22 +1099,26 @@ salir:				;inicia etiqueta salir
 		posiciona_cursor balap_y, balap_x ;Se posiciona el cursor a la posicion inicial de la bala (cualquiera que sea la columna y el renglon de partida)
 		imprime_caracter_color 173,cAzul,bgNegro ;proyectil pintado 
 		mov [balap_en_pant], 1 ;Marca que hay una bala en pantalla
+		read_time [cont_balp]
 		jmp fin_disp
 		repos_bala:
-		call DELAY ;Pequeño delay para mostrar la bala 
+		calcular_tiempo [cont_balp], 1 ;Compara si el tiempo transucurrido es suficiente
+		jb fin_disp ;Sino, se salta al final y omite todo
 		cmp balap_y, 2 ;Se fija si no es el final de la pantalla
 		je borrar_disparo ;Si lo es, se borra el disparo
-		detectar_colision
+		detectar_colision_en ;Detectar colision de la bala con la nave enemiga
 		posiciona_cursor balap_y, balap_x ;Sino, se posiciona el cursor en la posicion indicada
 		imprime_caracter_color 178,cNegro,bgNegro ;Se borra el proyectil
 		dec balap_y ;Se decrementa el renglon (esto hace que la bala "suba")
 		posiciona_cursor balap_y, balap_x
 		imprime_caracter_color 173,cAzul,bgNegro ;Se reimprime el proyectil mas arriba
+		read_time [cont_balp]
 		jmp fin_disp
 		borrar_disparo:
 		mov balap_en_pant, 0 ;Se indica que no hay disparos en pantalla
 		posiciona_cursor balap_y, balap_x
 		imprime_caracter_color 178,cNegro,bgNegro ;Se borra el proyectil
+		read_time [cont_balp]
 		fin_disp:
 		ret
 		endp
@@ -1070,9 +1134,43 @@ salir:				;inicia etiqueta salir
 	endp
 
 	MOVIMIENTO_ENEMIGO	 proc
-	
+
 	ret
 	endp
+
+DISPARAR_ENEMIGO proc
+		cmp bala_enemiga, 1 ; Comprueba si hay una bala enemiga en pantalla
+		je repos_bala_en ; Si hay una bala en pantalla, reposiciona la bala
+		dibujar_bala_en:
+		mov [balae_y], 6 ; Establece la posición inicial en el eje Y de la bala enemiga
+		mov bl, [enemy_col] ; Mueve el valor de la columna del enemigo a BL
+		mov [balae_x], bl ; Establece la posición inicial en el eje X de la bala enemiga
+		posiciona_cursor balae_y, balae_x ; Posiciona el cursor en la posición de la bala enemiga
+		imprime_caracter_color 33, cRojo, bgNegro ; Imprime el carácter correspondiente a la bala enemiga en rojo
+		mov [bala_enemiga], 1 ; Marca que hay una bala enemiga en pantalla
+		read_time [cont_bale] ; Lee el tiempo actual
+		jmp fin_disp_en ; Salta al final del procedimiento de disparo enemigo
+		repos_bala_en:
+		calcular_tiempo [cont_bale], 1 ; Compara si el tiempo transcurrido es suficiente
+		jb fin_disp_en ; Si no ha transcurrido suficiente tiempo, salta al final del procedimiento
+		cmp [balae_y], ini_renglon ; Comprueba si la bala enemiga alcanzó el borde superior de la pantalla
+		je borrar_bala_en ; Si lo hizo, borra la bala enemiga
+		detectar_colision
+		posiciona_cursor balae_y, balae_x ; Posiciona el cursor en la posición actual de la bala enemiga
+		imprime_caracter_color 178,cNegro,bgNegro ; Borra el carácter correspondiente a la bala enemiga
+		inc balae_y ; Incrementa la posición Y de la bala enemiga (hace que la bala "baje")
+		posiciona_cursor balae_y, balae_x ; Posiciona el cursor en la nueva posición de la bala enemiga
+		imprime_caracter_color 33, cRojo, bgNegro ; Vuelve a imprimir la bala enemiga un renglón más abajo
+		read_time [cont_bale] ; Lee el tiempo actual
+		jmp fin_disp_en ; Salta al final del procedimiento de disparo enemigo
+		borrar_bala_en:
+		mov bala_enemiga, 0 ; Indica que no hay balas enemigas en pantalla
+		posiciona_cursor balae_y, balae_x ; Posiciona el cursor en la posición actual de la bala enemiga
+		imprime_caracter_color 178,cNegro,bgNegro ; Borra el carácter correspondiente a la bala enemiga
+		read_time [cont_bale] ; Lee el tiempo actual
+		fin_disp_en:
+		ret ; Retorna al código principal
+endp
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;FIN PROCEDIMIENTOS;;;;;;
