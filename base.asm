@@ -117,6 +117,9 @@ blank			db 		"     "
 player_lives 	db 		3
 player_score 	dw 		0
 player_hiscore 	dw 		0
+filename		db		"hiscore.txt", "$"
+buffer			dw		0
+manejador_arc	dw		0
 
 player_col		db 		ini_columna 	;posicion en columna del jugador
 player_ren		db 		ini_renglon 	;posicion en renglon del jugador
@@ -356,6 +359,11 @@ detectar_colision_en		macro
 		call BORRA_ENEMIGO
 		inc player_score
 		call IMPRIME_SCORE
+		mov bx, player_score
+		cmp bx, player_hiscore
+		jbe no_colision
+		mov player_hiscore, bx
+		call IMPRIME_HISCORE
 	no_colision:
 	endm
 
@@ -370,6 +378,7 @@ detectar_colision		macro
 	cmp [balae_y], 20 ;si balap_y <= 18, no hay colision
 	jbe no_colision_jug
 	colision_jug:
+		call BLINK_PLAYER
 		cmp player_lives, 1
 		je salir ;ESTO ES TEMPORAL HASTA QUE SE PROGRAME EL GAME OVER
 		call BORRAR_LIVES
@@ -805,6 +814,44 @@ salir:				;inicia etiqueta salir
 		ret
 	endp
 
+	;Imprime la nave del jugador, que recibe como parámetros las variables ren_aux y col_aux, que indican la posición central inferior
+	PRINT_PLAYER_AZUL proc
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 219,cAzul,bgNegro
+		dec [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 219,cAzul,bgNegro
+		dec [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 219,cAzul,bgNegro
+		add [ren_aux],2
+		
+		dec [col_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 219,cAzul,bgNegro
+		dec [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 219,cAzul,bgNegro
+		inc [ren_aux]
+		
+		dec [col_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 219,cAzul,bgNegro
+		
+		add [col_aux],3
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 219,cAzul,bgNegro
+		dec [ren_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 219,cAzul,bgNegro
+		inc [ren_aux]
+		
+		inc [col_aux]
+		posiciona_cursor [ren_aux],[col_aux]
+		imprime_caracter_color 219,cAzul,bgNegro
+		ret
+	endp
+
 	;Borra la nave del jugador, que recibe como parámetros las variables ren_aux y col_aux, que indican la posición central de la barra
 	DELETE_PLAYER proc
 		;Implementar
@@ -1005,6 +1052,15 @@ salir:				;inicia etiqueta salir
 		ret
 	endp
 
+	IMPRIME_JUGADOR_AZUL proc
+		mov al,[player_col]
+		mov ah,[player_ren]
+		mov [col_aux],al
+		mov [ren_aux],ah
+		call PRINT_PLAYER_AZUL
+		ret
+	endp
+
 	IMPRIME_ENEMIGO proc
 		mov al,[enemy_col]
 		mov ah,[enemy_ren]
@@ -1138,6 +1194,17 @@ salir:				;inicia etiqueta salir
 	loop blink_loop
 	ret
 	endp
+
+	BLINK_PLAYER		proc
+	mov cx, 0FFFFh
+	blink_loop_p:
+		call IMPRIME_JUGADOR_AZUL
+		call DELAY
+		call IMPRIME_JUGADOR
+	loop blink_loop_p
+	ret
+	endp
+
 
 MOVIMIENTO_ENEMIGO	 proc
     ; Mover la nave enemiga según la dirección actual
