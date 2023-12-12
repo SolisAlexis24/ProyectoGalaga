@@ -113,13 +113,13 @@ titulo 			db 		"GALAGA"
 scoreStr 		db 		"SCORE"
 hiscoreStr		db 		"HI-SCORE"
 livesStr		db 		"LIVES"
+gameOver		db 		"GAME OVER"		;Muestra al usuario que ha perdido
 blank			db 		"     "
 player_lives 	db 		3
 player_score 	dw 		0
 player_hiscore 	dw 		0
-filename		db		"hiscore.txt", "$"
-buffer			dw		0
-manejador_arc	dw		0
+filename		db		"C:\galaga\hiscore.txt", 0
+manejador_arc	dw		?
 
 player_col		db 		ini_columna 	;posicion en columna del jugador
 player_ren		db 		ini_renglon 	;posicion en renglon del jugador
@@ -165,6 +165,11 @@ ocho			db 		8
 ;Cuando el driver del mouse no está disponible
 no_mouse		db 	'No se encuentra driver de mouse. Presione [enter] para salir$'
 ;////////////////////////////////////////////////////
+;Cuando no se puede encontrar el archivo
+error_abrir		db 	'No se encuentra el archivo. Presione [enter] para salir$'
+error_leer		db 	'No se puede leer el archivo. Presione [enter] para salir$'
+error_escribir		db 	'No se puede escribir el archivo. Presione [enter] para salir$'
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;Macros;;;;;;;;;
@@ -364,6 +369,7 @@ detectar_colision_en		macro
 		jbe no_colision
 		mov player_hiscore, bx
 		call IMPRIME_HISCORE
+		guardar_hiscore
 	no_colision:
 	endm
 
@@ -403,6 +409,48 @@ detectar_colision		macro
 	cmp dx, espaciado
 	endm
 
+	leer_hiscore	macro
+	;Abrir
+	mov ah, 3Dh
+	mov al, 2 ;Abrir el archivo en modo lectura
+	lea dx, filename
+	int 21h
+	jc error_al_abrir
+	mov manejador_arc, ax
+	;Leer
+	mov ah, 3Fh
+	mov bx, manejador_arc
+	lea dx, player_hiscore
+	mov cx, 2
+	int 21h
+	jc error_al_leer
+	;Cerrar
+	mov ah, 3Eh
+	mov bx, manejador_arc
+	int 21h
+	endm
+
+	guardar_hiscore	macro
+	;Abrir archivo
+	mov ah, 3Dh
+	mov al, 2 ;Abrir el archivo en modo lectura
+	lea dx, filename
+	int 21h
+	jc error_al_abrir
+	mov manejador_arc, ax
+	;Escribir
+	mov ah, 40h
+	mov bx, manejador_arc
+	mov cx, 2
+	lea dx, player_hiscore
+	int 21h
+	jc error_al_escribir
+	;Cerrar
+	mov ah, 3Eh
+	mov bx, manejador_arc
+	int 21h
+	endm
+
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;Fin Macros;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -419,6 +467,7 @@ inicio:					;etiqueta inicio
 	int 21h			;interrupcion 21h. Imprime cadena.
 	jmp teclado		;salta a 'teclado'
 imprime_ui:
+	leer_hiscore
 	clear 					;limpia pantalla
 	oculta_cursor_teclado	;oculta cursor del mouse
 	apaga_cursor_parpadeo 	;Deshabilita parpadeo del cursor
@@ -429,7 +478,6 @@ imprime_ui:
 ;Si el botón está presionado, continúa a la sección "mouse"
 ;si no, se mantiene indefinidamente en "mouse_no_clic" hasta que se suelte
 mouse_no_clic:
-
 	lee_mouse
 	test bx,0001h
 	jnz mouse_no_clic
@@ -488,6 +536,24 @@ boton_x3:
 
 mas_botones:
 	jmp mouse_no_clic
+
+error_al_abrir:
+	lea dx,[error_abrir]
+	mov ax,0900h	;opcion 9 para interrupcion 21h
+	int 21h			;interrupcion 21h. Imprime cadena.
+	jmp teclado		;salta a 'teclado'
+
+error_al_leer:
+	lea dx,[error_leer]
+	mov ax,0900h	;opcion 9 para interrupcion 21h
+	int 21h			;interrupcion 21h. Imprime cadena.
+	jmp teclado		;salta a 'teclado'
+
+error_al_escribir:
+	lea dx,[error_escribir]
+	mov ax,0900h	;opcion 9 para interrupcion 21h
+	int 21h			;interrupcion 21h. Imprime cadena.
+	jmp teclado		;salta a 'teclado'
 
 ;Si no se encontró el driver del mouse, muestra un mensaje y el usuario debe salir tecleando [enter]
 teclado:
