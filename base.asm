@@ -62,6 +62,8 @@ lim_superior 	equ		1
 lim_inferior 	equ		23
 lim_izquierdo 	equ		1
 lim_derecho 	equ		39
+lim_col_izq		equ		lim_izquierdo+2
+lim_col_der		equ		lim_derecho-2
 ;Valores de referencia para la posición inicial del jugador
 ini_columna 	equ 	lim_derecho/2
 ini_renglon 	equ 	22
@@ -121,6 +123,9 @@ player_ren		db 		ini_renglon 	;posicion en renglon del jugador
 
 enemy_col		db 		ini_columna 	;posicion en columna del enemigo
 enemy_ren		db 		3 				;posicion en renglon del enemigo
+direccion		db		0
+num_mov_e		db		0
+mov_abajo		db		0				;Variable booleana que indica si el ultimo movimiento vertical ue hacia arriba
 
 col_aux 		db 		0  		;variable auxiliar para operaciones con posicion - columna
 ren_aux 		db 		0 		;variable auxiliar para operaciones con posicion - renglon
@@ -129,6 +134,7 @@ conta 			db 		0 		;contador
 conta_movs		db      0		;Contador que contabiliza los movimientos del jugador
 cont_balp		dw		0
 cont_bale		dw		0
+cont_mov_e		dw		0
 
 ;; Variables de ayuda para lectura de tiempo del sistema
 tick_ms			dw 		55 		;55 ms por cada tick del sistema, esta variable se usa para operación de MUL convertir ticks a segundos
@@ -150,8 +156,6 @@ balap_x			db		ini_columna
 balap_y			db		ren_bala_in
 balae_x			db		ini_columna
 balae_y			db		6
-cont_col_jug	db		0
-
 
 ;Auxiliar para calculo de coordenadas del mouse en modo Texto
 ocho			db 		8
@@ -367,10 +371,11 @@ detectar_colision		macro
 	jbe no_colision_jug
 	colision_jug:
 		cmp player_lives, 1
-		je no_colision_jug ;ESTO ES TEMPORAL HASTA QUE SE PROGRAME EL GAME OVER
+		je salir ;ESTO ES TEMPORAL HASTA QUE SE PROGRAME EL GAME OVER
 		call BORRAR_LIVES
 		dec player_lives
 		call IMPRIME_LIVES
+		call IMPRIME_JUGADOR
 	no_colision_jug:
 	endm
 
@@ -415,12 +420,13 @@ imprime_ui:
 ;Si el botón está presionado, continúa a la sección "mouse"
 ;si no, se mantiene indefinidamente en "mouse_no_clic" hasta que se suelte
 mouse_no_clic:
+
 	lee_mouse
 	test bx,0001h
 	jnz mouse_no_clic
 ;Lee el mouse y avanza hasta que se haga clic en el boton izquierdo
 mouse:
-	;call MOVIMIENTO_ENEMIGO
+	call MOVIMIENTO_ENEMIGO
 	call DISPARAR_ENEMIGO
 	revisa_teclado
 	call DISPARAR_PLAYER
@@ -1133,10 +1139,62 @@ salir:				;inicia etiqueta salir
 	ret
 	endp
 
-	MOVIMIENTO_ENEMIGO	 proc
-
-	ret
-	endp
+MOVIMIENTO_ENEMIGO	 proc
+    ; Mover la nave enemiga según la dirección actual
+	calcular_tiempo cont_mov_e, 1 ; Calcula el tiempo desde el ultimo moviemiento
+	jb no_move_e ;Si el movimiento no es suficiente, no se mueve
+	cmp num_mov_e, 5
+	je mover_vertical
+    cmp direccion, 1 ;Revisa si ;a direccion del movimiento es a la derecha
+    je mover_enemigo_derecha ;Si lo es, mueve a la izquierda
+	mover_enemigo_izquierda: ;Sino, se mueve a la izquierda
+	call BORRA_ENEMIGO
+	calcular_limites_enemigo ;Se calculan los limites del enemigo 
+	cmp al, lim_izquierdo 
+	je lim_izquierdo_col ; Si lim_izq del enemigo = lim_izq hay colision con borde izq, por ello, salta a lim_izq_col
+	dec enemy_col ;Sino, mueve al enemigo
+	inc num_mov_e
+	jmp imprimir_nave_E ;Se salta a imprimir la nave
+	mover_enemigo_derecha:
+	call BORRA_ENEMIGO
+	calcular_limites_enemigo ;Se calculan los limites del enemigo
+	cmp ah, lim_derecho
+	je lim_derecho_col ; Si lim_der del enemigo = lim_der hay colision con borde der, por ello, salta a lim_der_col
+	inc enemy_col ;Sino, se mueve al enemigo
+	inc num_mov_e
+	jmp imprimir_nave_E ;Se salta a imprimri la nave
+	lim_izquierdo_col:
+    ; Limitar la posición de la nave enemiga dentro de los límites
+    mov enemy_col, lim_col_izq
+    mov direccion, 1 ; Cambiar la dirección a derecha
+    jmp imprimir_nave_E
+	lim_derecho_col:
+    ; Limitar la posición de la nave enemiga dentro de los límites
+    mov enemy_col, lim_col_der
+    mov direccion, 0 ; Cambiar la dirección a izquierda
+	jmp imprimir_nave_E
+	mover_vertical:
+		mover_enemigo_abajo:
+		call BORRA_ENEMIGO
+		cmp mov_abajo, 1
+		je mover_enemigo_arriba
+		inc enemy_ren
+		inc mov_abajo
+		mov num_mov_e, 0
+		jmp imprimir_nave_E
+		mover_enemigo_arriba:
+		call BORRA_ENEMIGO
+		dec enemy_ren
+		dec mov_abajo
+		mov num_mov_e, 0
+		jmp imprimir_nave_E
+	imprimir_nave_E:
+    ; Imprimir la nave enemiga
+    call IMPRIME_ENEMIGO
+	read_time cont_mov_e ;Se lee el tiempo en el que se hizo el movimiento 
+	no_move_e:
+    ret
+endp
 
 DISPARAR_ENEMIGO proc
 		cmp bala_enemiga, 1 ; Comprueba si hay una bala enemiga en pantalla
@@ -1154,7 +1212,7 @@ DISPARAR_ENEMIGO proc
 		calcular_tiempo [cont_bale], 1 ; Compara si el tiempo transcurrido es suficiente
 		jb fin_disp_en ; Si no ha transcurrido suficiente tiempo, salta al final del procedimiento
 		cmp [balae_y], ini_renglon ; Comprueba si la bala enemiga alcanzó el borde superior de la pantalla
-		je borrar_bala_en ; Si lo hizo, borra la bala enemiga
+		je borrar_bala_en ; Si lo hizo, borra la bala enemiga	
 		detectar_colision
 		posiciona_cursor balae_y, balae_x ; Posiciona el cursor en la posición actual de la bala enemiga
 		imprime_caracter_color 178,cNegro,bgNegro ; Borra el carácter correspondiente a la bala enemiga
