@@ -357,11 +357,16 @@ detectar_colision_en		macro
 	jb no_colision ;si balap_x < limite izq. del enemigo, no hay colision
 	cmp [balap_x], ah
 	jg no_colision ;si balap_x > limite der. del enemigo, no hay colision
-	cmp [balap_y], 5 ;si balap_y >= 5, no hay colision
+	mov bh, [enemy_ren] 
+	add bh, 3
+	cmp [balap_y], bh ;si balap_y >= bh, no hay colision
 	ja no_colision
 	colision:
 		call BLINK_ENEMY
 		call BORRA_ENEMIGO
+		mov [enemy_col], ini_columna ;Coloca al enemigo en su columna original
+		mov [enemy_ren], 3 ;Coloca al enemigo en su renglon inicial
+		mov [mov_abajo], 0 ;Los movimientos del enemigo hacia abajo se resetean
 		inc player_score
 		call IMPRIME_SCORE
 		mov bx, player_score
@@ -374,7 +379,6 @@ detectar_colision_en		macro
 	endm
 
 ;Macro para detectar la colision de una bala con el jugador
-;AUN NO TERMINADO
 detectar_colision		macro
 	calcular_limites_jugador
 	cmp [balae_x], al
@@ -1439,8 +1443,8 @@ MOVIMIENTO_ENEMIGO	 proc
 	mover_vertical:
 		mover_enemigo_abajo:
 		call BORRA_ENEMIGO
-		cmp mov_abajo, 1
-		je mover_enemigo_arriba
+		cmp mov_abajo, 15
+		jae mover_enemigo_arriba
 		inc enemy_ren
 		inc mov_abajo
 		mov num_mov_e, 0
@@ -1463,7 +1467,9 @@ DISPARAR_ENEMIGO proc
 		cmp bala_enemiga, 1 ; Comprueba si hay una bala enemiga en pantalla
 		je repos_bala_en ; Si hay una bala en pantalla, reposiciona la bala
 		dibujar_bala_en:
-		mov [balae_y], 6 ; Establece la posición inicial en el eje Y de la bala enemiga
+		mov bh, [enemy_ren]
+		add bh, 3
+		mov [balae_y], bh ; Establece la posición inicial en el eje Y de la bala enemiga
 		mov bl, [enemy_col] ; Mueve el valor de la columna del enemigo a BL
 		mov [balae_x], bl ; Establece la posición inicial en el eje X de la bala enemiga
 		posiciona_cursor balae_y, balae_x ; Posiciona el cursor en la posición de la bala enemiga
