@@ -454,7 +454,7 @@ detectar_colision		macro
 	verificar_botones	macro
 	lee_mouse
 	test bx,0001h 		
-	jz principal
+	jz principal ;Se revisa si se hizo clic en el mouse
 	conversion_mouse_p:
 	;Leer la posicion del mouse y hacer la conversion a resolucion
 	;80x25 (columnas x renglones) en modo texto
@@ -474,9 +474,9 @@ detectar_colision		macro
 	;Aquí se revisa si se hizo clic en el botón izquierdo
 	test bx,0001h 		;Para revisar si el boton izquierdo del mouse fue presionado
 	jz mouse 			;Si el boton izquierdo no fue presionado, vuelve a leer el estado del mouse
-	cmp dx,0
+	cmp dx,0 ;Se revisa si es en el renglon del boton de salir
 	je boton_x_p
-	jmp renglon_botones_p
+	jmp renglon_botones_p ;Sino lo fue, se revisa si fue en el renglon de los botones
 	boton_x_p:
 	jmp boton_x1_p
 	;Lógica para revisar si el mouse fue presionado en [X]
@@ -493,45 +493,47 @@ detectar_colision		macro
 		;Se cumplieron todas las condiciones
 	jmp salir
 	renglon_botones_p:
-		cmp dx, 21
-		jbe	columnas_botones_p
-		jmp no_botones
+		cmp dx, 21 
+		jbe	columnas_botones_p ;Se verifica si fue en el renglon de los botones
+		jmp no_botones ;sino, se salta todo el proceso
 	columnas_botones_p:
-		cmp cx, 49           ;Verifica la columna que se oprime segun el boton
+		cmp cx, 49         
 		je boton_stop_p		
 		cmp cx,48
-		je boton_stop_p		;Verifica la columna que se oprime segun el boton
+		je boton_stop_p		
 		cmp cx,50
-		je boton_stop_p		;Verifica la columna que se oprime segun el boton	
+		je boton_stop_p		;Verifica si es dentro del area del boton stop	
 
-		cmp cx, 59  		;Verifica la columna que se oprime segun el boton
+		cmp cx, 59  		
 		je boton_pause
 		cmp cx,	58
 		je boton_pause
 		cmp cx, 60
-		je boton_pause
+		je boton_pause		;Verifica si es dentro del area del boton pause
 
-		cmp cx, 69 		;Verifica la columna que se oprime segun el boton
+		cmp cx, 69 		
 		je boton_play_p
 		cmp cx, 68
 		je boton_play_p
 		cmp cx, 70
-		je boton_play_p
-
-		jmp principal
+		je boton_play_p ;Verifica si es dentro del area del boton play
 	boton_stop_p:
-		mov [player_lives],3
-		mov [player_score],0
-		mov [enemy_ren], 3
-		mov [enemy_col], ini_columna
-		mov [player_ren], ini_renglon
-		mov [player_col], ini_columna
-		jmp imprime_ui
+				mov [player_lives],3
+				mov [player_score],0
+				mov [enemy_ren], 3
+				mov [enemy_col], ini_columna
+				mov [player_ren], ini_renglon
+				mov [player_col], ini_columna
+				mov [balae_x], ini_columna
+				mov [balae_y], 6
+				mov [balap_x], ini_columna
+				mov [balap_y], ren_bala_in
+				jmp imprime_ui ;Resetea tod el juego y sus variables
 	boton_pause:
 		mov [status], 2
-		jmp mouse_no_clic
+		jmp mouse_no_clic ;Se pausa el juego
 	boton_play_p:
-		jmp principal
+		jmp principal ;Se reanuda el juego
 	no_botones:
 	endm
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -630,18 +632,19 @@ boton_play_Renglon:
 	jbe boton_play_Columna
 	jmp mouse_no_clic
 	boton_play_Columna:
-		cmp cx, 49           ;Verifica la columna que se oprime segun el boton
+		cmp cx, 49           
 		je boton_stop		
 		cmp cx,48
-		je boton_stop		;Verifica la columna que se oprime segun el boton
+		je boton_stop		
 		cmp cx,50
-		je boton_stop		;Verifica la columna que se oprime segun el boton	
-		cmp cx, 68  		;Verifica la columna que se oprime segun el boton
+		je boton_stop		;Verifica si es dentro del area del boton stop
+
+		cmp cx, 68  		
 		je boton_Play
 		cmp cx, 69
 		je boton_Play
 		cmp cx, 70
-		je boton_Play
+		je boton_Play		;;Verifica si es dentro del area del boton play
 		jmp mouse_no_clic   ;En caso de que no se oprima ningun boton
 			boton_Play:
 				cmp cx, 68
