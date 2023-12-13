@@ -341,6 +341,7 @@ calcular_limites_enemigo	macro
 	mov ah, bl ;limite derecho del enemigo en ah
 	endm
 
+;Devuelve los limites izquierdo y derecho del jugador en al y ah respectivamente
 calcular_limites_jugador	macro
 	mov bl, player_col
 	mov bh, player_ren
@@ -413,6 +414,7 @@ detectar_colision		macro
 	cmp dx, espaciado
 	endm
 
+;Macro para leer el hiscore del archivo
 	leer_hiscore	macro
 	;Abrir
 	mov ah, 3Dh
@@ -434,6 +436,7 @@ detectar_colision		macro
 	int 21h
 	endm
 
+;Macro para guardar el highscore en el archivo
 	guardar_hiscore	macro
 	;Abrir archivo
 	mov ah, 3Dh
@@ -455,6 +458,7 @@ detectar_colision		macro
 	int 21h
 	endm
 
+;Macro para verificar si el mouse se ha presionado, y si es asi, si ha sido en algun boton de la pantalla
 	verificar_botones	macro
 	lee_mouse
 	test bx,0001h 		
@@ -530,6 +534,7 @@ detectar_colision		macro
 				mov [player_col], ini_columna
 				mov [balae_x], ini_columna
 				mov [balae_y], 6
+				mov [mov_abajo], 0
 				mov [balap_x], ini_columna
 				mov [balap_y], ren_bala_in
 				jmp imprime_ui ;Resetea tod el juego y sus variables
@@ -540,6 +545,37 @@ detectar_colision		macro
 		jmp principal ;Se reanuda el juego
 	no_botones:
 	endm
+
+;Macro para detectar la colisión entre el enemigo y el jugador
+detectar_colision_enemigo_jugador macro
+	cmp [enemy_ren], 18
+	jb no_colision_enem_jug ;Se verifica si el renglon del enemigo es mayor a 18, esto quiere decir que puede chocar de lado con la nave del jugador
+	verificar_columnas:
+    calcular_limites_jugador
+	cmp [enemy_col], al
+	je colision_enem_jug 
+	cmp [enemy_col], ah
+	je colision_enem_jug ;Si los limites del jugador coinciden con la columna del enemigo, hay colision
+	jmp no_colision_enem_jug
+    colision_enem_jug:
+        ; Código a ejecutar cuando hay colisión entre el enemigo y el jugador
+        ; Por ejemplo, restar una vida al jugador, reiniciar posición del enemigo, etc.
+        call BLINK_PLAYER
+        cmp player_lives, 1
+        je fin_juego
+        call BORRAR_LIVES
+        dec player_lives
+        call IMPRIME_LIVES
+        call IMPRIME_JUGADOR
+		;;Se podiciona al enemigo en la posicion original
+		mov [enemy_ren], 3
+		mov [enemy_col], ini_columna
+		mov [balae_x], ini_columna
+		mov [balae_y], 6
+		mov [mov_abajo], 0
+    no_colision_enem_jug:
+endm
+
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;Fin Macros;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -622,7 +658,7 @@ boton_x3:
 	;Se cumplieron todas las condiciones
 	jmp salir
 
-
+;;Loop principal del juego
 principal:
 	call MOVIMIENTO_ENEMIGO
 	call DISPARAR_ENEMIGO
@@ -662,6 +698,7 @@ boton_play_Renglon:
 				mov [player_col], ini_columna
 				mov [balae_x], ini_columna
 				mov [balae_y], 6
+				mov [mov_abajo], 0
 				mov [balap_x], ini_columna
 				mov [balap_y], ren_bala_in
 				jmp imprime_ui
@@ -1443,7 +1480,7 @@ MOVIMIENTO_ENEMIGO	 proc
 	mover_vertical:
 		mover_enemigo_abajo:
 		call BORRA_ENEMIGO
-		cmp mov_abajo, 15
+		cmp mov_abajo, 16
 		jae mover_enemigo_arriba
 		inc enemy_ren
 		inc mov_abajo
@@ -1456,6 +1493,7 @@ MOVIMIENTO_ENEMIGO	 proc
 		mov num_mov_e, 0
 		jmp imprimir_nave_E
 	imprimir_nave_E:
+	detectar_colision_enemigo_jugador
     ; Imprimir la nave enemiga
     call IMPRIME_ENEMIGO
 	read_time cont_mov_e ;Se lee el tiempo en el que se hizo el movimiento 
