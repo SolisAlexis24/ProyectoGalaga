@@ -386,7 +386,7 @@ detectar_colision		macro
 	colision_jug:
 		call BLINK_PLAYER
 		cmp player_lives, 1
-		je salir ;ESTO ES TEMPORAL HASTA QUE SE PROGRAME EL GAME OVER
+		je fin_juego
 		call BORRAR_LIVES
 		dec player_lives
 		call IMPRIME_LIVES
@@ -451,6 +451,89 @@ detectar_colision		macro
 	int 21h
 	endm
 
+	verificar_botones	macro
+	lee_mouse
+	test bx,0001h 		
+	jz principal
+	conversion_mouse_p:
+	;Leer la posicion del mouse y hacer la conversion a resolucion
+	;80x25 (columnas x renglones) en modo texto
+	mov ax,dx 			;Copia DX en AX. DX es un valor entre 0 y 199 (renglon)
+	div [ocho] 			;Division de 8 bits
+						;divide el valor del renglon en resolucion 640x200 en donde se encuentra el mouse
+						;para obtener el valor correspondiente en resolucion 80x25
+	xor ah,ah 			;Descartar el residuo de la division anterior
+	mov dx,ax 			;Copia AX en DX. AX es un valor entre 0 y 24 (renglon)
+
+	mov ax,cx 			;Copia CX en AX. CX es un valor entre 0 y 639 (columna)
+	div [ocho] 			;Division de 8 bits
+						;divide el valor de la columna en resolucion 640x200 en donde se encuentra el mouse
+						;para obtener el valor correspondiente en resolucion 80x25
+	xor ah,ah 			;Descartar el residuo de la division anterior
+	mov cx,ax 			;Copia AX en CX. AX es un valor entre 0 y 79 (columna)
+	;Aquí se revisa si se hizo clic en el botón izquierdo
+	test bx,0001h 		;Para revisar si el boton izquierdo del mouse fue presionado
+	jz mouse 			;Si el boton izquierdo no fue presionado, vuelve a leer el estado del mouse
+	cmp dx,0
+	je boton_x_p
+	jmp renglon_botones_p
+	boton_x_p:
+	jmp boton_x1_p
+	;Lógica para revisar si el mouse fue presionado en [X]
+	;[X] se encuentra en renglon 0 y entre columnas 76 y 78
+	boton_x1_p:
+		cmp cx,76
+		jge boton_x2_p
+		jmp principal
+	boton_x2_p:
+		cmp cx,78
+		jbe boton_x3_p
+		jmp principal
+	boton_x3_p:
+		;Se cumplieron todas las condiciones
+	jmp salir
+	renglon_botones_p:
+		cmp dx, 21
+		jbe	columnas_botones_p
+		jmp no_botones
+	columnas_botones_p:
+		cmp cx, 49           ;Verifica la columna que se oprime segun el boton
+		je boton_stop_p		
+		cmp cx,48
+		je boton_stop_p		;Verifica la columna que se oprime segun el boton
+		cmp cx,50
+		je boton_stop_p		;Verifica la columna que se oprime segun el boton	
+
+		cmp cx, 59  		;Verifica la columna que se oprime segun el boton
+		je boton_pause
+		cmp cx,	58
+		je boton_pause
+		cmp cx, 60
+		je boton_pause
+
+		cmp cx, 69 		;Verifica la columna que se oprime segun el boton
+		je boton_play_p
+		cmp cx, 68
+		je boton_play_p
+		cmp cx, 70
+		je boton_play_p
+
+		jmp principal
+	boton_stop_p:
+		mov [player_lives],3
+		mov [player_score],0
+		mov [enemy_ren], 3
+		mov [enemy_col], ini_columna
+		mov [player_ren], ini_renglon
+		mov [player_col], ini_columna
+		jmp imprime_ui
+	boton_pause:
+		mov [status], 2
+		jmp mouse_no_clic
+	boton_play_p:
+		jmp principal
+	no_botones:
+	endm
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;Fin Macros;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -483,10 +566,6 @@ mouse_no_clic:
 	jnz mouse_no_clic
 ;Lee el mouse y avanza hasta que se haga clic en el boton izquierdo
 mouse:
-	call MOVIMIENTO_ENEMIGO
-	call DISPARAR_ENEMIGO
-	revisa_teclado
-	call DISPARAR_PLAYER
 	lee_mouse
 conversion_mouse:
 	;Leer la posicion del mouse y hacer la conversion a resolucion
@@ -511,6 +590,9 @@ conversion_mouse:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;Aqui va la lógica de la posicion del mouse;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;PLAY
+	cmp dx, play_ren
+	jge boton_play_renglon
 	;Si el mouse fue presionado en el renglon 0
 	;se va a revisar si fue dentro del boton [X]
 	cmp dx,0
@@ -534,9 +616,48 @@ boton_x3:
 	;Se cumplieron todas las condiciones
 	jmp salir
 
-mas_botones:
-	jmp mouse_no_clic
 
+principal:
+	call MOVIMIENTO_ENEMIGO
+	call DISPARAR_ENEMIGO
+	revisa_teclado
+	call DISPARAR_PLAYER
+	verificar_botones
+	jmp principal
+
+boton_play_Renglon:
+	cmp dx, 21 				;verifica en que renglon se esta oprimiendo
+	jbe boton_play_Columna
+	jmp mouse_no_clic
+	boton_play_Columna:
+		cmp cx, 49           ;Verifica la columna que se oprime segun el boton
+		je boton_stop		
+		cmp cx,48
+		je boton_stop		;Verifica la columna que se oprime segun el boton
+		cmp cx,50
+		je boton_stop		;Verifica la columna que se oprime segun el boton	
+		cmp cx, 68  		;Verifica la columna que se oprime segun el boton
+		je boton_Play
+		cmp cx, 69
+		je boton_Play
+		cmp cx, 70
+		je boton_Play
+		jmp mouse_no_clic   ;En caso de que no se oprima ningun boton
+			boton_Play:
+				cmp cx, 68
+				jmp principal
+			boton_stop:
+				mov [player_lives],3
+				mov [player_score],0
+				mov [enemy_ren], 3
+				mov [enemy_col], ini_columna
+				mov [player_ren], ini_renglon
+				mov [player_col], ini_columna
+				mov [balae_x], ini_columna
+				mov [balae_y], 6
+				mov [balap_x], ini_columna
+				mov [balap_y], ren_bala_in
+				jmp imprime_ui
 error_al_abrir:
 	lea dx,[error_abrir]
 	mov ax,0900h	;opcion 9 para interrupcion 21h
@@ -555,6 +676,12 @@ error_al_escribir:
 	int 21h			;interrupcion 21h. Imprime cadena.
 	jmp teclado		;salta a 'teclado'
 
+fin_juego:
+	call BORRAR_LIVES
+	call BORRA_JUGADOR
+	posiciona_cursor lives_ren, lives_col
+	imprime_cadena_color [gameOver], 9, cAmarillo, bgNegro
+	jmp mouse_no_clic
 ;Si no se encontró el driver del mouse, muestra un mensaje y el usuario debe salir tecleando [enter]
 teclado:
 	mov ah,08h
